@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>シニアKブログ内検索</title>
+    <title>シニアKブログ内検索ランチャー</title>
     <style>
         body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
         .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -12,13 +12,6 @@
         .search-form input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; }
         .search-form input[type="submit"] { padding: 10px 20px; border: none; background: #007bff; color: white; cursor: pointer; border-radius: 0 4px 4px 0; }
         .search-form input[type="submit"]:hover { background: #0056b3; }
-        .results-count { margin-bottom: 20px; color: #555; }
-        .result-item { border-bottom: 1px solid #eee; padding: 15px 0; }
-        .result-item:last-child { border-bottom: none; }
-        .result-item h2 { margin: 0 0 5px 0; font-size: 1.2em; }
-        .result-item h2 a { text-decoration: none; color: #0056b3; }
-        .result-item h2 a:hover { text-decoration: underline; }
-        .result-item p { margin: 0; color: #666; font-size: 0.9em; }
         footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; text-align: center; color: #888; font-size: 0.9em; }
         footer p { margin: 5px 0; }
         footer a { color: #0056b3; text-decoration: none; }
@@ -27,25 +20,13 @@
 </head>
 <body>
     <div class="container">
-        <h1>シニアKブログ内検索</h1>
-        <form action="/" method="post" class="search-form">
-            <input type="text" name="query" placeholder="検索キーワードを入力" value="{{ query }}">
+        <h1>シニアKブログ内検索ランチャー</h1>
+        
+        <!-- formの送信先を/searchに設定。JavaScriptは不要。 -->
+        <form action="/search" method="post" class="search-form">
+            <input type="text" name="query" placeholder="検索キーワードを入力">
             <input type="submit" value="検索">
         </form>
-
-        {% if results %}
-            <p class="results-count">{{ results|length }}件の記事が見つかりました。</p>
-            <div class="search-results">
-                {% for result in results %}
-                <div class="result-item">
-                    <h2><a href="{{ result.link }}" target="_blank" rel="noopener noreferrer">{{ result.title }}</a></h2>
-                    <p>{{ result.description }}</p>
-                </div>
-                {% endfor %}
-            </div>
-        {% elif query %}
-            <p>「{{ query }}」に一致する記事は見つかりませんでした。</p>
-        {% endif %}
 
         <footer>
             <p>
@@ -55,12 +36,8 @@
             {% if version %}
             <p>Ver. {{ version }}</p>
             {% endif %}
-            
-            <!-- ▼▼▼ ここが追加された行 ▼▼▼ -->
             <p><a href="/download_log">検索ログをダウンロード</a></p>
-            <!-- ▲▲▲ ここまで ▲▲▲ -->
         </footer>
-
     </div>
 </body>
 </html>
