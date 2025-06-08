@@ -1,71 +1,62 @@
-from flask import Flask, render_template, request
-import requests
-from bs4 import BeautifulSoup
-import datetime
-import os
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シニアKブログ内検索</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .search-form { display: flex; margin-bottom: 20px; }
+        .search-form input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px 0 0 4px; }
+        .search-form input[type="submit"] { padding: 10px 20px; border: none; background: #007bff; color: white; cursor: pointer; border-radius: 0 4px 4px 0; }
+        .search-form input[type="submit"]:hover { background: #0056b3; }
+        .results-count { margin-bottom: 20px; color: #555; }
+        .result-item { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .result-item:last-child { border-bottom: none; }
+        .result-item h2 { margin: 0 0 5px 0; font-size: 1.2em; }
+        .result-item h2 a { text-decoration: none; color: #0056b3; }
+        .result-item h2 a:hover { text-decoration: underline; }
+        .result-item p { margin: 0; color: #666; font-size: 0.9em; }
+        footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; text-align: center; color: #888; font-size: 0.9em; }
+        footer p { margin: 5px 0; }
+        footer a { color: #0056b3; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>シニアKブログ内検索</h1>
+        <form action="/" method="post" class="search-form">
+            <input type="text" name="query" placeholder="検索キーワードを入力" value="{{ query }}">
+            <input type="submit" value="検索">
+        </form>
 
-# バージョン情報: ソースを修正するたびに+0.1ずつ加算する
-__version__ = "0.2"
+        {% if results %}
+            <p class="results-count">{{ results|length }}件の記事が見つかりました。</p>
+            <div class="search-results">
+                {% for result in results %}
+                <div class="result-item">
+                    <h2><a href="{{ result.link }}" target="_blank" rel="noopener noreferrer">{{ result.title }}</a></h2>
+                    <p>{{ result.description }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        {% elif query %}
+            <p>「{{ query }}」に一致する記事は見つかりませんでした。</p>
+        {% endif %}
 
-app = Flask(__name__)
+        <footer>
+            <p>
+                <a href="https://ameblo.jp/kaki-kent/" target="_blank" rel="noopener noreferrer">シニアＫブログ</a> | 
+                <a href="https://www.youtube.com/@kakikent" target="_blank" rel="noopener noreferrer">シニアＫのビログ (YouTube)</a>
+            </p>
+            {% if version %}
+            <p>Ver. {{ version }}</p>
+            {% endif %}
+        </footer>
 
-def scrape_ameblo(query):
-    """
-    Amebaブログのサイト内検索結果をスクレイピングする関数
-    """
-    if not query:
-        return []
-
-    # Amebaブログの検索URL
-    search_url = f"https://search.ameba.jp/user/search.do?query={query}&target=blog&user=kaki-kent&num=10"
-    
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-
-    try:
-        response = requests.get(search_url, headers=headers, timeout=10)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the page: {e}")
-        return [{"title": "ページの取得に失敗しました", "link": "#", "description": str(e)}]
-
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    results = []
-    for item in soup.select('li.skin-borderQuiet.searchResultItem'):
-        title_tag = item.select_one('a.searchResultTitle')
-        description_tag = item.select_one('p.searchResultDescription')
-        
-        if title_tag and description_tag:
-            title = title_tag.get_text(strip=True)
-            link = title_tag.get('href')
-            description = description_tag.get_text(strip=True)
-            results.append({'title': title, 'link': link, 'description': description})
-            
-    return results
-
-@app.route('/', methods=['GET', 'POST'])
-def search():
-    search_query = ""
-    results = []
-    if request.method == 'POST':
-        search_query = request.form['query']
-        
-        # --- ログ記録のコード ---
-        log_dir = 'logs'
-        os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, 'search_log.txt')
-
-        with open(log_file_path, 'a', encoding='utf-8') as f:
-            timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            f.write(f"{timestamp} - {search_query}\n")
-        # --- ログ記録ここまで ---
-        
-        results = scrape_ameblo(search_query)
-
-    # version=__version__ を追加して、HTML側にバージョン番号を渡します
-    return render_template('index.html', query=search_query, results=results, version=__version__)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    </div>
+</body>
+</html>
