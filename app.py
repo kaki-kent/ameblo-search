@@ -3,25 +3,20 @@ import requests
 from bs4 import BeautifulSoup
 import datetime
 import os
-import urllib.parse # <- 新しく追加
+import urllib.parse
+import json # <- 新しく追加
 
 # バージョン情報: ソースを修正するたびに+0.1ずつ加算する
-__version__ = "0.4" # バージョンを0.4に更新
+__version__ = "0.5" # バージョンを0.5に更新
 
 app = Flask(__name__)
 
-# ▼▼▼ scrape_ameblo関数を全面的に修正 ▼▼▼
+# ▼▼▼ scrape_ameblo関数を「宝の地図」作戦に書き換え ▼▼▼
 def scrape_ameblo(query):
-    """
-    Amebaブログの"新しい"サイト内検索結果をスクレイピングする関数
-    """
     if not query:
         return []
 
-    # 日本語キーワードをURLエンコードする
     query_encoded = urllib.parse.quote(query)
-    
-    # 新しいAmebaブログの検索URL形式
     search_url = f"https://search.ameba.jp/search/entry/{query_encoded}.html?aid=kaki-kent"
     
     headers = {
@@ -37,18 +32,34 @@ def scrape_ameblo(query):
 
     soup = BeautifulSoup(response.content, 'html.parser')
     
+    # 「宝の地図」である __NEXT_DATA__ というscriptタグを探す
+    next_data_script = soup.find('script', {'id': '__NEXT_DATA__'})
+    
+    if not next_data_script:
+        print("Error: Could not find the result data (__NEXT_DATA__).")
+        return []
+
+    try:
+        # 地図（JSON文字列）を読み解いて、Pythonのデータに変換
+        data = json.loads(next_data_script.string)
+        # 地図の中から記事一覧（entries）の場所を探す
+        entries = data['props']['pageProps']['searchResult']['entries']
+    except (json.JSONDecodeError, KeyError, TypeError):
+        # 地図が読み解けない、または記事一覧がない場合は0件とする
+        print("Error: Failed to parse JSON or find entries.")
+        return []
+
     results = []
-    # 新しいHTML構造に対応したセレクタ（目印）に変更
-    # [data-testid="..."] という属性を目印にする
-    for item in soup.select('[data-testid="result-item"]'):
-        title_tag = item.select_one('[data-testid="result-item-title"]')
-        description_tag = item.select_one('[data-testid="result-item-snippet"]')
+    for entry in entries:
+        # titleやcontentには<mark>タグなどが含まれるため、再度パースして文字だけ抽出
+        title_soup = BeautifulSoup(entry.get('title', ''), 'html.parser')
+        description_soup = BeautifulSoup(entry.get('content', ''), 'html.parser')
         
-        if title_tag and description_tag:
-            title = title_tag.get_text(strip=True)
-            link = title_tag.get('href')
-            description = description_tag.get_text(strip=True)
-            results.append({'title': title, 'link': link, 'description': description})
+        title = title_soup.get_text(strip=True)
+        link = entry.get('entryUrl', '#')
+        description = description_soup.get_text(strip=True)
+        
+        results.append({'title': title, 'link': link, 'description': description})
             
     return results
 # ▲▲▲ ここまでが修正箇所 ▲▲▲
