@@ -1,71 +1,72 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory # send_from_directory を追加
 import requests
 from bs4 import BeautifulSoup
 import datetime
 import os
 
 # バージョン情報: ソースを修正するたびに+0.1ずつ加算する
-__version__ = "0.2"
+__version__ = "0.3" # バージョンを0.3に更新
 
 app = Flask(__name__)
 
+# (この間の scrape_ameblo 関数は変更なしなので、そのままです)
 def scrape_ameblo(query):
-    """
-    Amebaブログのサイト内検索結果をスクレイピングする関数
-    """
     if not query:
         return []
-
-    # Amebaブログの検索URL
     search_url = f"https://search.ameba.jp/user/search.do?query={query}&target=blog&user=kaki-kent&num=10"
-    
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-
     try:
         response = requests.get(search_url, headers=headers, timeout=10)
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching the page: {e}")
         return [{"title": "ページの取得に失敗しました", "link": "#", "description": str(e)}]
-
     soup = BeautifulSoup(response.content, 'html.parser')
-    
     results = []
     for item in soup.select('li.skin-borderQuiet.searchResultItem'):
         title_tag = item.select_one('a.searchResultTitle')
         description_tag = item.select_one('p.searchResultDescription')
-        
         if title_tag and description_tag:
             title = title_tag.get_text(strip=True)
             link = title_tag.get('href')
             description = description_tag.get_text(strip=True)
             results.append({'title': title, 'link': link, 'description': description})
-            
     return results
 
+# (この search 関数も変更なしなので、そのままです)
 @app.route('/', methods=['GET', 'POST'])
 def search():
     search_query = ""
     results = []
     if request.method == 'POST':
         search_query = request.form['query']
-        
-        # --- ログ記録のコード ---
         log_dir = 'logs'
         os.makedirs(log_dir, exist_ok=True)
         log_file_path = os.path.join(log_dir, 'search_log.txt')
-
         with open(log_file_path, 'a', encoding='utf-8') as f:
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             f.write(f"{timestamp} - {search_query}\n")
-        # --- ログ記録ここまで ---
-        
         results = scrape_ameblo(search_query)
-
-    # version=__version__ を追加して、HTML側にバージョン番号を渡します
     return render_template('index.html', query=search_query, results=results, version=__version__)
+
+
+# ▼▼▼ ここからがログダウンロード機能の追加部分 ▼▼▼
+@app.route('/download_log')
+def download_log_file():
+    log_dir = 'logs'
+    log_filename = 'search_log.txt'
+    log_path = os.path.join(log_dir, log_filename)
+
+    # ログファイルが存在するかチェック
+    if not os.path.exists(log_path):
+        return "ログファイルはまだ作成されていません。一度、検索を実行してください。", 404
+
+    # ファイルをダウンロードさせる
+    return send_from_directory(log_dir, log_filename, as_attachment=True)
+# ▲▲▲ ここまでが追加部分 ▲▲▲
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
