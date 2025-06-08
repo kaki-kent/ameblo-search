@@ -4,14 +4,13 @@ from bs4 import BeautifulSoup
 import datetime
 import os
 import urllib.parse
-import json # <- 新しく追加
+import json
 
 # バージョン情報: ソースを修正するたびに+0.1ずつ加算する
-__version__ = "0.5" # バージョンを0.5に更新
+__version__ = "0.6" # バージョンを0.6に更新
 
 app = Flask(__name__)
 
-# ▼▼▼ scrape_ameblo関数を「宝の地図」作戦に書き換え ▼▼▼
 def scrape_ameblo(query):
     if not query:
         return []
@@ -19,9 +18,16 @@ def scrape_ameblo(query):
     query_encoded = urllib.parse.quote(query)
     search_url = f"https://search.ameba.jp/search/entry/{query_encoded}.html?aid=kaki-kent"
     
+    # ▼▼▼ ヘッダー情報を強化して、より人間らしいリクエストに見せかける ▼▼▼
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Referer': 'https://www.google.com/' # Google検索から来たように見せかける
     }
+    # ▲▲▲ ここまでが変更箇所 ▲▲▲
 
     try:
         response = requests.get(search_url, headers=headers, timeout=10)
@@ -32,38 +38,31 @@ def scrape_ameblo(query):
 
     soup = BeautifulSoup(response.content, 'html.parser')
     
-    # 「宝の地図」である __NEXT_DATA__ というscriptタグを探す
     next_data_script = soup.find('script', {'id': '__NEXT_DATA__'})
     
     if not next_data_script:
-        print("Error: Could not find the result data (__NEXT_DATA__).")
+        print("Error: Could not find the result data (__NEXT_DATA__). Ameba might be blocking the request.")
         return []
 
     try:
-        # 地図（JSON文字列）を読み解いて、Pythonのデータに変換
         data = json.loads(next_data_script.string)
-        # 地図の中から記事一覧（entries）の場所を探す
         entries = data['props']['pageProps']['searchResult']['entries']
     except (json.JSONDecodeError, KeyError, TypeError):
-        # 地図が読み解けない、または記事一覧がない場合は0件とする
         print("Error: Failed to parse JSON or find entries.")
         return []
 
     results = []
     for entry in entries:
-        # titleやcontentには<mark>タグなどが含まれるため、再度パースして文字だけ抽出
         title_soup = BeautifulSoup(entry.get('title', ''), 'html.parser')
         description_soup = BeautifulSoup(entry.get('content', ''), 'html.parser')
-        
         title = title_soup.get_text(strip=True)
         link = entry.get('entryUrl', '#')
         description = description_soup.get_text(strip=True)
-        
         results.append({'title': title, 'link': link, 'description': description})
             
     return results
-# ▲▲▲ ここまでが修正箇所 ▲▲▲
 
+# --- この下のコードは変更なし ---
 
 @app.route('/', methods=['GET', 'POST'])
 def search():
